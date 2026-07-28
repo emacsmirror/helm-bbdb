@@ -53,6 +53,12 @@ To show only contact names, use:
 
 In name-only mode, only contact names are displayed and searchable.
 
+Candidates are colorized by default. To disable candidate faces, use:
+
+```elisp
+(setq helm-bbdb-use-faces nil)
+```
+
 ## Address editing
 
 `bbdb-edit-field` and `bbdb-insert-field` can edit BBDB addresses with

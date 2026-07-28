@@ -44,6 +44,7 @@
 (defvar bbdb-phone-label-list)
 (defvar bbdb-address-label-list)
 (defvar bbdb-default-xfield)
+(defvar bbdb-name-face-alist)
 
 (declare-function bbdb-record-mail "ext:bbdb-com" (record) t)
 (declare-function bbdb-records "ext:bbdb" ())
@@ -59,6 +60,7 @@
 (declare-function bbdb-display-record "ext:bbdb" (record layout number))
 (declare-function bbdb-delete-records "ext:bbdb-com" (records &optional noprompt))
 (declare-function bbdb-record-name "ext:bbdb")
+(declare-function bbdb-record-xfield "ext:bbdb" (record label))
 
 (defconst helm-bbdb--end-street-lines-value
   'helm-bbdb--end-street-lines)
@@ -173,12 +175,32 @@ are searchable by Helm."
           (const :tag "BBDB one-line layout" one-line))
   :group 'helm-bbdb)
 
+(defcustom helm-bbdb-use-faces t
+  "Whether to colorize candidates with BBDB faces."
+  :type 'boolean
+  :group 'helm-bbdb)
+
 (defun helm-bbdb--record-display-name (record)
   "Return a display name for RECORD."
-  (let ((name (bbdb-record-name record)))
-    (if (or (not name) (string= name ""))
-        "???"
-      name)))
+  (let* ((name (bbdb-record-name record))
+         (display (if (or (not name) (string= name ""))
+                      "???"
+                    name)))
+    (if helm-bbdb-use-faces
+        (propertize display 'face (helm-bbdb--record-name-face record))
+      display)))
+
+;; Honor per-record `name-face' xfields, including
+;; `bbdb-name-face-alist'.
+(defun helm-bbdb--record-name-face (record)
+  "Return the face used for RECORD's display name."
+  (let* ((value (bbdb-record-xfield record 'name-face))
+         (face-symbol (and (stringp value)
+                           (intern-soft value))))
+    (cond ((facep value) value)
+          ((facep face-symbol) face-symbol)
+          ((cdr (assoc value bbdb-name-face-alist)))
+          (t 'bbdb-name))))
 
 (defun helm-bbdb--candidate (display record)
   "Return a Helm candidate with DISPLAY and BBDB RECORD."
@@ -188,11 +210,13 @@ are searchable by Helm."
   "Return RECORD formatted using BBDB's one-line layout."
   (erase-buffer)
   (bbdb-display-record record 'one-line 0)
+  (goto-char (point-max))
+  (skip-chars-backward " \t\n")
   (let ((display
-         (replace-regexp-in-string
-          "[ \t\n]*\\'" ""
-          (buffer-substring-no-properties
-           (point-min) (point-max)))))
+         (funcall (if helm-bbdb-use-faces
+                      #'buffer-substring
+                    #'buffer-substring-no-properties)
+                  (point-min) (point))))
     (if (string= display "")
         (helm-bbdb--record-display-name record)
       display)))
